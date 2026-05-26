@@ -3,9 +3,9 @@ import os
 import shutil
 from datetime import datetime
 
-PIPELINE_ROOT = os.path.join(os.path.dirname(__file__), "Pipeline")
-OUTPUTS_ROOT  = os.path.join(os.path.dirname(__file__), "Pipeline", "outputs")
-ORCHESTRATOR  = os.path.join(os.path.dirname(__file__), "Pipeline", "orchestrator.py")
+PIPELINE_ROOT = os.path.join(os.path.dirname(__file__), "pipeline")
+OUTPUTS_ROOT  = os.path.join(os.path.dirname(__file__), "pipeline", "outputs")
+ORCHESTRATOR  = os.path.join(os.path.dirname(__file__), "pipeline", "orchestrator.py")
 
 def run_week1_pipeline(input_folder: str) -> dict:
 
