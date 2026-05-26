@@ -1,0 +1,13 @@
+pipeline/outputs/
+pipeline/input/
+pipeline/logs/
+pipeline/frames/
+pipeline/.env
+.env
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+.venv/
+venv/
+*.tmp
