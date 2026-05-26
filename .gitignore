@@ -6,11 +6,8 @@ pipeline/.env
 .env
 __pycache__/
 *.pyc
-*.tmp
 .pytest_cache/
 *.egg-info/
 .venv/
 venv/
-.streamlit/secrets.toml
-config.py
-credentials.json
+*.tmp.streamlit/secrets.toml

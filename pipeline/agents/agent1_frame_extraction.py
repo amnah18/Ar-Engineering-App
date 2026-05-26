@@ -24,21 +24,18 @@ def _extract_from_video(video_path: str, output_folder: str, seen_hashes: list, 
     print(f"\n[Agent 1] Video: {Path(video_path).name}")
 
     try:
-        import imageio.v2 as iio2  # type: ignore[import]
+        import imageio
     except ImportError:
-        try:
-            import imageio as iio2  # type: ignore[no-redef]
-        except ImportError:
-            raise RuntimeError("imageio not installed. Add 'imageio[ffmpeg]' to requirements.txt")
+        raise RuntimeError("imageio not installed. Add 'imageio[ffmpeg]' to requirements.txt")
 
     saved = []
     counter = counter_start
 
-    # Use imageio v2 API for reliable fps metadata across all backends
-    reader = iio2.get_reader(video_path)
     try:
+        reader = imageio.get_reader(video_path)
         meta = reader.get_meta_data()
-        fps = meta.get("fps") or 25
+        fps = meta.get("fps", 25)
+        # Sample one frame every 5 seconds
         sample_every = max(1, int(fps * 5))
 
         for frame_idx, frame in enumerate(reader):
@@ -47,9 +44,9 @@ def _extract_from_video(video_path: str, output_folder: str, seen_hashes: list, 
 
             img = Image.fromarray(frame).convert("RGB")
 
-            # Brightness check using ImageStat (faster than sum(getdata()))
-            from PIL import ImageStat
-            brightness = ImageStat.Stat(img.convert("L")).mean[0]
+            # Basic brightness check
+            grayscale = img.convert("L")
+            brightness = sum(grayscale.getdata()) / len(grayscale.getdata())
             if brightness < 40 or brightness > 220:
                 continue
 
@@ -64,8 +61,11 @@ def _extract_from_video(video_path: str, output_folder: str, seen_hashes: list, 
             saved.append(filepath)
             counter += 1
             print(f"  Saved {filename}")
-    finally:
+
         reader.close()
+
+    except Exception as e:
+        print(f"[Agent 1] Video extraction error: {e}")
 
     return saved
 

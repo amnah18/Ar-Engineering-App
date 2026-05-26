@@ -8,6 +8,5 @@ numpy
 imagehash
 python-dotenv
 groq
-imageio
-imageio-ffmpeg
+scenedetect[opencv-headless]
 reportlab
