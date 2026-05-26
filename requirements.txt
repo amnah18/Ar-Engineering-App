@@ -9,4 +9,4 @@ imagehash
 python-dotenv
 groq
 scenedetect[opencv]
-opencv-python-headless
+opencv-python-headlessreportlab
