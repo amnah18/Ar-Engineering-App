@@ -11,3 +11,5 @@ groq
 scenedetect[opencv-headless]
 reportlab
 gspread
+imageio
+imageio-ffmpeg
