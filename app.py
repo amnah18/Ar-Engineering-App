@@ -13,7 +13,7 @@ from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from week1_runner import run_week1_pipeline  # type: ignore[import]
 
-GROQ_API_KEY = os.environ.get("GROQ_API_KEY")S
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 
 
 # ─── PAGE CONFIG ──────────────────────────────────────────────────────
