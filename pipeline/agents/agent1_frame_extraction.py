@@ -4,7 +4,7 @@
 
 import os
 from pathlib import Path
-from PIL import Image
+from PIL import Image, ImageStat
 import imagehash
 
 VIDEO_EXTS = {".mp4", ".mov"}
@@ -24,18 +24,19 @@ def _extract_from_video(video_path: str, output_folder: str, seen_hashes: list, 
     print(f"\n[Agent 1] Video: {Path(video_path).name}")
 
     try:
-        import imageio
+        try:
+            import imageio.v2 as iio  # type: ignore[import]
+        except ImportError:
+            import imageio as iio  # type: ignore[no-redef]
     except ImportError:
         raise RuntimeError("imageio not installed. Add 'imageio[ffmpeg]' to requirements.txt")
 
     saved = []
     counter = counter_start
 
+    reader = iio.get_reader(video_path)
     try:
-        reader = imageio.get_reader(video_path)
-        meta = reader.get_meta_data()
-        fps = meta.get("fps", 25)
-        # Sample one frame every 5 seconds
+        fps = (reader.get_meta_data().get("fps") or 25)
         sample_every = max(1, int(fps * 5))
 
         for frame_idx, frame in enumerate(reader):
@@ -44,9 +45,7 @@ def _extract_from_video(video_path: str, output_folder: str, seen_hashes: list, 
 
             img = Image.fromarray(frame).convert("RGB")
 
-            # Basic brightness check
-            grayscale = img.convert("L")
-            brightness = sum(grayscale.getdata()) / len(grayscale.getdata())
+            brightness = ImageStat.Stat(img.convert("L")).mean[0]
             if brightness < 40 or brightness > 220:
                 continue
 
@@ -61,11 +60,8 @@ def _extract_from_video(video_path: str, output_folder: str, seen_hashes: list, 
             saved.append(filepath)
             counter += 1
             print(f"  Saved {filename}")
-
+    finally:
         reader.close()
-
-    except Exception as e:
-        print(f"[Agent 1] Video extraction error: {e}")
 
     return saved
 

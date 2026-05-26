@@ -1,7 +1,9 @@
+import os
 import json
 import re
 import requests
-from config import GROQ_API_KEY
+
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
 
 def generate_renovation_package(address, bedrooms, bathrooms, scope, details, measurements, start_date):
     
