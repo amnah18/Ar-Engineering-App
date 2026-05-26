@@ -8,6 +8,6 @@ numpy
 imagehash
 python-dotenv
 groq
-scenedetect[opencv]
+scenedetect
 opencv-python-headless
 reportlab
