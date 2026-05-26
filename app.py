@@ -13,7 +13,7 @@ from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from week1_runner import run_week1_pipeline  # type: ignore[import]
 
-GROQ_API_KEY = st.secrets.get("GROQ_API_KEY", os.environ.get("GROQ_API_KEY", ""))
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY")S
 
 
 # ─── PAGE CONFIG ──────────────────────────────────────────────────────
@@ -75,18 +75,22 @@ def generate_pdf(content, title):
 
 def get_sheets():
     try:
+        import json
         import gspread
+        import streamlit as st
         from google.oauth2.service_account import Credentials
+        
         scope = [
             "https://spreadsheets.google.com/feeds",
             "https://www.googleapis.com/auth/drive"
         ]
-        creds = Credentials.from_service_account_file("credentials.json", scopes=scope)
+        
+        creds_dict = json.loads(st.secrets["GOOGLE_CREDENTIALS"])
+        creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
         client = gspread.authorize(creds)
         return client.open_by_key("1FsfXTixyoXCGpPj7J0FkpzESutXdMcimqVKnBM-We2k")
     except Exception:
         return None
-
 
 # ─── HEADER ───────────────────────────────────────────────────────────
 st.title("🏗️ AR Engineering Services")
