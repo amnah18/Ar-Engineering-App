@@ -11,3 +11,6 @@ __pycache__/
 .venv/
 venv/
 *.tmp.streamlit/secrets.toml
+.streamlit/secrets.toml
+credentials.json
+config.py
