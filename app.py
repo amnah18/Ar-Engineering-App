@@ -1,17 +1,19 @@
 import os
+import io
+import re
+import json
+import zipfile
+import tempfile
+import shutil
+from datetime import datetime
 
 import streamlit as st
 import requests
-import json
-import re
-import io
-from datetime import datetime
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
-from config import GROQ_API_KEY
-import mammoth
-import tempfile
-import shutil
+from week1_runner import run_week1_pipeline  # type: ignore[import]
+
+GROQ_API_KEY = st.secrets.get("GROQ_API_KEY", os.environ.get("GROQ_API_KEY", ""))
 
 
 # ─── PAGE CONFIG ──────────────────────────────────────────────────────
@@ -470,8 +472,6 @@ with tab4:
         st.success(f"✅ {len(uploaded_files)} file(s) ready: {', '.join([f.name for f in uploaded_files])}")
 
         if st.button("🔍 Run Pipeline", type="primary", use_container_width=True):
-            from week1_runner import run_week1_pipeline
-
             # Save all uploaded files into a temp folder
             temp_input = tempfile.mkdtemp()
             for f in uploaded_files:
@@ -491,9 +491,6 @@ with tab4:
             else:
                 st.success("✅ Pipeline complete.")
                 st.divider()
-                import zipfile
-                import io
-
                 zip_buffer = io.BytesIO()
                 with zipfile.ZipFile(zip_buffer, "w") as zf:
                     for docx_path in result["docx"]:
