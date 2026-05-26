@@ -8,6 +8,5 @@ numpy
 imagehash
 python-dotenv
 groq
-scenedetect
-opencv-python-headless==4.10.0.84
+scenedetect[opencv-headless]
 reportlab
