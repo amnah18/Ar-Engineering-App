@@ -80,29 +80,24 @@ def generate_pdf(content, title):
 
 
 def get_sheets():
+    import streamlit as st
+    import gspread
+    import json
+    from google.oauth2.service_account import Credentials
+
+    scope = [
+        "https://spreadsheets.google.com/feeds",
+        "https://www.googleapis.com/auth/drive"
+    ]
+
     try:
-        import streamlit as st
-        import gspread
-        import json
-        from google.oauth2.service_account import Credentials
-
-        scope = [
-            "https://spreadsheets.google.com/feeds",
-            "https://www.googleapis.com/auth/drive"
-        ]
-
-        if os.path.exists("credentials.json"):
-            creds = Credentials.from_service_account_file("credentials.json", scopes=scope)
-        else:
-            creds_dict = json.loads(st.secrets["GOOGLE_CREDENTIALS"])
-            creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
-
+        creds_dict = json.loads(st.secrets["GOOGLE_CREDENTIALS"])
+        creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
         client = gspread.authorize(creds)
         return client.open_by_key("1FsfXTixyoXCGpPj7J0FkpzESutXdMcimqVKnBM-We2k")
 
     except Exception as e:
-        import streamlit as st
-        st.sidebar.error(f"Sheets error: {e}")
+        st.error(f"Sheets exact error: {e}")
         return None
 
 # ─── HEADER ───────────────────────────────────────────────────────────
