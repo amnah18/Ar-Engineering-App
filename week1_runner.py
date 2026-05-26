@@ -1,47 +1,37 @@
 import sys
 import os
+from dotenv import load_dotenv
 
-# Add pipeline to Python path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "pipeline"))
+_pipeline_root = os.path.join(os.path.dirname(os.path.abspath(__file__)), "pipeline")
 
-from orchestrator import run_pipeline
-import tempfile
-import shutil
-import zipfile
-import io
+# Add pipeline to Python path so orchestrator and its agents can be imported
+sys.path.insert(0, _pipeline_root)
 
-OUTPUTS_ROOT = os.path.join(os.path.dirname(__file__), "pipeline", "outputs")
+load_dotenv(os.path.join(_pipeline_root, ".env"))
+OUTPUT_FOLDER = os.environ.get("OUTPUT_FOLDER", os.path.join(_pipeline_root, "outputs"))
 
-def run_week1_pipeline(uploaded_files: list) -> dict:
-    # Save uploaded files to temp input folder
-    temp_input = tempfile.mkdtemp()
-    for f in uploaded_files:
-        save_path = os.path.join(temp_input, f.name)
-        with open(save_path, "wb") as out:
-            out.write(f.read())
+from orchestrator import run_pipeline  # noqa: E402 — must come after sys.path update
 
+
+def run_week1_pipeline(input_folder: str) -> dict:
     # Snapshot existing output folders
-    os.makedirs(OUTPUTS_ROOT, exist_ok=True)
-    existing = set(os.listdir(OUTPUTS_ROOT))
+    os.makedirs(OUTPUT_FOLDER, exist_ok=True)
+    existing = set(os.listdir(OUTPUT_FOLDER))
 
     try:
-        # Call orchestrator directly — same Python process, same environment
-        run_pipeline(temp_input)
+        run_pipeline(input_folder)
     except Exception as e:
-        shutil.rmtree(temp_input, ignore_errors=True)
         return {"error": str(e)}
 
-    shutil.rmtree(temp_input, ignore_errors=True)
-
-    # Find new output folder
-    new_folders = set(os.listdir(OUTPUTS_ROOT)) - existing
+    # Find new output folder created by the pipeline
+    new_folders = set(os.listdir(OUTPUT_FOLDER)) - existing
     if not new_folders:
-        all_folders = [os.path.join(OUTPUTS_ROOT, f) for f in os.listdir(OUTPUTS_ROOT)]
+        all_folders = [os.path.join(OUTPUT_FOLDER, f) for f in os.listdir(OUTPUT_FOLDER)]
         if not all_folders:
             return {"error": "No output folder found."}
         latest = max(all_folders, key=os.path.getmtime)
     else:
-        latest = os.path.join(OUTPUTS_ROOT, sorted(new_folders)[-1])
+        latest = os.path.join(OUTPUT_FOLDER, sorted(new_folders)[-1])
 
     docs_folder = os.path.join(latest, "docs")
     if not os.path.exists(docs_folder):
@@ -51,10 +41,4 @@ def run_week1_pipeline(uploaded_files: list) -> dict:
     if not docx_files:
         return {"error": f"No documents found in {docs_folder}"}
 
-    zip_buffer = io.BytesIO()
-    with zipfile.ZipFile(zip_buffer, "w") as zf:
-        for f in docx_files:
-            zf.write(os.path.join(docs_folder, f), f)
-    zip_buffer.seek(0)
-
-    return {"zip": zip_buffer}
+    return {"docx": [os.path.join(docs_folder, f) for f in sorted(docx_files)]}

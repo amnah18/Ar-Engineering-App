@@ -1,33 +1,17 @@
 # agents/agent1_frame_extraction.py
-# Input:  folder containing any mix of .mp4, .mov, .jpg, .jpeg
-# Output: flat folder of .jpg frames ready for Agent 2
+# Rewritten to use Pillow only — no cv2, no scenedetect
+# Works on any server including Streamlit Cloud
 
-import cv2
 import os
 from pathlib import Path
-
 from PIL import Image
 import imagehash
-from scenedetect import open_video, SceneManager
-from scenedetect.detectors import ContentDetector
 
 VIDEO_EXTS = {".mp4", ".mov"}
 IMAGE_EXTS = {".jpg", ".jpeg", ".png"}
 
 
-# ── Quality helpers ────────────────────────────────────────────────────────
-
-def _sharpness(frame) -> float:
-    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    return cv2.Laplacian(gray, cv2.CV_64F).var()
-
-
-def _brightness(frame) -> float:
-    return cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY).mean()
-
-
-def _phash(frame):
-    img = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+def _phash(img: Image.Image):
     return imagehash.phash(img)
 
 
@@ -35,90 +19,69 @@ def _is_duplicate(new_hash, seen: list, threshold: int = 6) -> bool:
     return any(abs(new_hash - h) < threshold for h in seen)
 
 
-# ── Video → frames ─────────────────────────────────────────────────────────
-
 def _extract_from_video(video_path: str, output_folder: str, seen_hashes: list, counter_start: int) -> list:
+    """Extract frames from video using imageio — no cv2 needed."""
     print(f"\n[Agent 1] Video: {Path(video_path).name}")
 
-    video = open_video(video_path)
-    scene_manager = SceneManager()
-    scene_manager.add_detector(ContentDetector(threshold=27.0))
-    scene_manager.detect_scenes(video)
-    scenes = scene_manager.get_scene_list()
-
-    cap = cv2.VideoCapture(video_path)
-    if not cap.isOpened():
-        raise RuntimeError(f"Cannot open video: {video_path}")
-
-    fps = cap.get(cv2.CAP_PROP_FPS) or 25
-    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-
-    sample_points = (
-        [((s.get_frames() + e.get_frames()) // 2) for s, e in scenes]
-        if scenes else list(range(0, total_frames, int(fps * 5)))
-    )
+    try:
+        import imageio
+    except ImportError:
+        raise RuntimeError("imageio not installed. Add 'imageio[ffmpeg]' to requirements.txt")
 
     saved = []
     counter = counter_start
 
-    for scene_idx, base_frame in enumerate(sample_points):
-        candidates = []
+    try:
+        reader = imageio.get_reader(video_path)
+        meta = reader.get_meta_data()
+        fps = meta.get("fps", 25)
+        # Sample one frame every 5 seconds
+        sample_every = max(1, int(fps * 5))
 
-        for offset in [-15, -10, -5, 0, 5, 10, 15]:
-            frame_num = max(0, base_frame + offset)
-            cap.set(cv2.CAP_PROP_POS_FRAMES, frame_num)
-            ret, frame = cap.read()
-            if not ret or frame is None:
+        for frame_idx, frame in enumerate(reader):
+            if frame_idx % sample_every != 0:
                 continue
 
-            sharp = _sharpness(frame)
-            bright = _brightness(frame)
+            img = Image.fromarray(frame).convert("RGB")
 
-            if sharp < 120 or bright < 40 or bright > 220:
+            # Basic brightness check
+            grayscale = img.convert("L")
+            brightness = sum(grayscale.getdata()) / len(grayscale.getdata())
+            if brightness < 40 or brightness > 220:
                 continue
 
-            h = _phash(frame)
+            h = _phash(img)
             if _is_duplicate(h, seen_hashes):
                 continue
 
-            candidates.append((sharp, frame_num, frame, h))
-
-        if not candidates:
-            cap.set(cv2.CAP_PROP_POS_FRAMES, base_frame)
-            ret, frame = cap.read()
-            if ret and frame is not None:
-                candidates.append((0, base_frame, frame, _phash(frame)))
-
-        candidates.sort(key=lambda x: x[0], reverse=True)
-
-        for sharp, _, frame, h in candidates[:1]:
-            if _is_duplicate(h, seen_hashes):
-                continue
             seen_hashes.append(h)
-            filename = f"frame_{counter:04d}_scene{scene_idx:03d}.jpg"
+            filename = f"frame_{counter:04d}_scene{frame_idx:06d}.jpg"
             filepath = os.path.join(output_folder, filename)
-            cv2.imwrite(filepath, frame)
+            img.save(filepath, "JPEG", quality=85)
             saved.append(filepath)
             counter += 1
-            print(f"  Saved {filename}  sharpness={sharp:.1f}")
+            print(f"  Saved {filename}")
 
-    cap.release()
+        reader.close()
+
+    except Exception as e:
+        print(f"[Agent 1] Video extraction error: {e}")
+
     return saved
 
-
-# ── Image passthrough ──────────────────────────────────────────────────────
 
 def _copy_images(image_paths: list, output_folder: str, seen_hashes: list, counter_start: int) -> list:
     saved = []
     counter = counter_start
 
     for src in image_paths:
-        frame = cv2.imread(str(src))
-        if frame is None:
-            print(f"  [Agent 1] Cannot read image, skipping: {src.name}")
+        try:
+            img = Image.open(str(src)).convert("RGB")
+        except Exception as e:
+            print(f"  [Agent 1] Cannot read image, skipping: {src.name} — {e}")
             continue
 
-        h = _phash(frame)
+        h = _phash(img)
         if _is_duplicate(h, seen_hashes):
             print(f"  [Agent 1] Duplicate, skipping: {src.name}")
             continue
@@ -126,7 +89,7 @@ def _copy_images(image_paths: list, output_folder: str, seen_hashes: list, count
         seen_hashes.append(h)
         filename = f"frame_{counter:04d}_{src.stem}.jpg"
         filepath = os.path.join(output_folder, filename)
-        cv2.imwrite(filepath, frame)
+        img.save(filepath, "JPEG", quality=85)
         saved.append(filepath)
         counter += 1
         print(f"  Copied {filename}")
@@ -134,15 +97,7 @@ def _copy_images(image_paths: list, output_folder: str, seen_hashes: list, count
     return saved
 
 
-# ── Main entry point ───────────────────────────────────────────────────────
-
 def process_input_folder(input_folder: str, output_frames_folder: str) -> list:
-    """
-    Accepts a folder with any mix of .mp4, .mov, .jpg, .jpeg.
-    Videos → scene-detected frames.
-    Images → deduplicated and copied directly.
-    Returns sorted list of all .jpg frame paths.
-    """
     os.makedirs(output_frames_folder, exist_ok=True)
 
     existing = sorted(Path(output_frames_folder).glob("*.jpg"))
@@ -155,14 +110,12 @@ def process_input_folder(input_folder: str, output_frames_folder: str) -> list:
     images = sorted(f for f in input_path.rglob("*") if f.suffix.lower() in IMAGE_EXTS)
 
     if not videos and not images:
-        raise RuntimeError(
-            f"No .mp4, .mov, .jpg or .jpeg files found in {input_folder}"
-        )
+        raise RuntimeError(f"No supported files found in {input_folder}")
 
-    print(f"\n[Agent 1] Found {len(videos)} video(s), {len(images)} image(s) in {input_folder}")
+    print(f"\n[Agent 1] Found {len(videos)} video(s), {len(images)} image(s)")
 
-    seen_hashes: list = []
-    all_frames: list = []
+    seen_hashes = []
+    all_frames = []
 
     for video in videos:
         frames = _extract_from_video(str(video), output_frames_folder, seen_hashes, len(all_frames))
@@ -177,6 +130,5 @@ def process_input_folder(input_folder: str, output_frames_folder: str) -> list:
     return sorted(all_frames)
 
 
-# kept for backwards compatibility with any direct callers
 def extract_frames(video_path: str, output_folder: str) -> list:
     return _extract_from_video(video_path, output_folder, [], 0)
